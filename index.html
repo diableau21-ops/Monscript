@@ -92,8 +92,13 @@ function beep(freq,dur,type,vol){let a=ctxAudio();if(!a)return;let o=a.createOsc
 function stopMusic(){if(music){clearInterval(music);music=null}}function startMusic(){stopMusic();if(!soundOn)return;let notes=[392,0,523,0,659,523,440,0,392,0,587,0,659,587,523,0];step=0;music=setInterval(()=>{if(g&&g.state==='run'&&soundOn){let n=notes[step++%notes.length];if(n)beep(n,.12,'triangle',.016)}},180)}
 function overlay(title,desc,label,fn){$('overlayTitle').textContent=title;$('overlayText').textContent=desc;$('overlayAction').textContent=label;$('overlay').classList.remove('hide');$('overlayAction').onclick=fn}
 function start(level){cancelAnimationFrame(raf);stopMusic();tries++;saveData();g={level:level,scroll:0,y:F-34,vy:0,rot:0,state:'ready',pct:0};$('gameTitle').textContent=level.name.toUpperCase();$('attempt').textContent=tries;$('best').textContent=(bests[level.id]||0)+'%';$('percent').textContent='0%';$('bar').style.width='0%';show('gameScreen');drawGame();overlay('READY?','ESPACE, clic ou toucher pour sauter.','▶ START',begin)}
-function begin(){if(!g)return;g.state='run';g.scroll=0;g.y=F-34;g.vy=0;g.rot=0;last=0;$('overlay').classList.add('hide');ctxAudio();startMusic();raf=requestAnimationFrame(loop)}
-function jump(){if(g&&g.state==='run'&&g.y>=F-35){g.vy=-660;beep(620,.07,'square',.025)}}
+function begin(){if(!g)return;g.state='run';g.scroll=0;g.y=F-34;g.vy=0;g.rot=0;g.gravity=1;g.speedFactor=1;g.sizeFactor=1;g.grounded=true;g.usedOrbs=new Set();g.triggered=new Set();last=0;$('overlay').classList.add('hide');ctxAudio();startMusic();raf=requestAnimationFrame(loop)}
+function jump(){
+ if(!g||g.state!=='run')return;
+ const near=(g.level.objects||[]).find(o=>o.t==='orb'&&!g.usedOrbs.has(o.x)&&Math.abs((o.x-g.scroll+PX)-PX)<48&&Math.abs((F-72)- (g.y+17))<58);
+ if(near){g.usedOrbs.add(near.x);g.vy=-g.gravity*720;beep(850,.09,'triangle',.04);return}
+ if(g.grounded){g.vy=-g.gravity*660;g.grounded=false;beep(620,.07,'square',.025)}
+}
 $('game').addEventListener('pointerdown',e=>{e.preventDefault();if(g&&g.state==='ready')begin();else jump()});document.addEventListener('keydown',e=>{if((e.code==='Space'||e.code==='ArrowUp')&&$('gameScreen').classList.contains('active')){e.preventDefault();if(g&&g.state==='ready')begin();else jump()}if(e.code==='Escape'&&$('gameScreen').classList.contains('active')){stopMusic();cancelAnimationFrame(raf);show('levels')}});
 $('restart').onclick=()=>g&&start(g.level);$('back').onclick=()=>{stopMusic();cancelAnimationFrame(raf);show('levels')};$('sound').onclick=()=>{soundOn=!soundOn;$('sound').textContent=soundOn?'♫ SON ON':'♫ SON OFF';if(!soundOn)stopMusic();else if(g&&g.state==='run')startMusic()};
 function bg(c,s){c.fillStyle='#0b132b';c.fillRect(0,0,W,H);let gr=c.createLinearGradient(0,0,W,H);gr.addColorStop(0,'#152a50');gr.addColorStop(1,'#161538');c.fillStyle=gr;c.fillRect(0,0,W,H);c.save();c.translate(-(s*.28)%80,0);c.strokeStyle='#5bdfff17';for(let x=-80;x<W+100;x+=80){c.beginPath();c.moveTo(x,0);c.lineTo(x,H);c.stroke()}for(let y=30;y<H;y+=40){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke()}c.restore()}
@@ -124,7 +129,33 @@ function hit(o,x,y){
  if(o.t==='halfBlock')return x+29>o.x-g.scroll+PX+2&&x+3<o.x-g.scroll+PX+32&&y+29>F-17;
  return hitBase(o,x,y);
 }
-function loop(t){if(!g||g.state!=='run')return;let dt=Math.min(.032,(t-last)/1000||.016);last=t;g.scroll+=g.level.speed*dt;g.vy+=1850*dt;g.y+=g.vy*dt;if(g.y>F-34){g.y=F-34;g.vy=0}if(g.vy<0)g.rot-=7*dt;else if(g.y>=F-34)g.rot=Math.round(g.rot/(Math.PI/2))*(Math.PI/2);else g.rot+=7*dt;for(let o of g.level.objects.slice().sort((a,b)=>a.x-b.x)){if(o.x-g.scroll+PX>PX+90)break;if(hit(o,PX,g.y)){die();return}}g.pct=Math.min(100,Math.floor(g.scroll/g.level.length*100));$('percent').textContent=g.pct+'%';$('bar').style.width=g.pct+'%';if(g.pct>(bests[g.level.id]||0)){bests[g.level.id]=g.pct;$('best').textContent=g.pct+'%';saveData()}drawGame();if(g.scroll>=g.level.length){win();return}raf=requestAnimationFrame(loop)}
+function loop(t){
+ if(!g||g.state!=='run')return;
+ let dt=Math.min(.032,(t-last)/1000||.016);last=t;
+ g.scroll+=g.level.speed*g.speedFactor*dt;
+ const objs=g.level.objects.slice().sort((a,b)=>a.x-b.x);
+ for(const o of objs){
+  const sx=o.x-g.scroll+PX, crossed=sx<PX+30&&sx>PX-42;
+  if(!crossed||g.triggered.has(o.x))continue;
+  if(o.t==='pad'&&g.grounded){g.vy=-g.gravity*900;g.grounded=false;g.triggered.add(o.x);beep(740,.12,'triangle',.035)}
+  else if(o.t==='gravityPortal'){g.gravity*=-1;g.vy=0;g.grounded=false;g.triggered.add(o.x);beep(520,.16,'sine',.04)}
+  else if(o.t==='speedPortal'){g.speedFactor=g.speedFactor>=1.45?0.78:1.45;g.triggered.add(o.x);beep(980,.1,'square',.035)}
+  else if(o.t==='portal'){g.sizeFactor=g.sizeFactor===1?.72:1;g.triggered.add(o.x);beep(640,.1,'sine',.03)}
+ }
+ g.vy+=1850*g.gravity*dt;g.y+=g.vy*dt;
+ g.grounded=false;
+ if(g.gravity>0&&g.y>=F-34){g.y=F-34;g.vy=0;g.grounded=true}
+ if(g.gravity<0&&g.y<=0){g.y=0;g.vy=0;g.grounded=true}
+ if(g.vy<0)g.rot-=7*dt;else if(g.grounded)g.rot=Math.round(g.rot/(Math.PI/2))*(Math.PI/2);else g.rot+=7*dt;
+ for(const o of objs){
+  if(o.x-g.scroll+PX>PX+90)break;
+  if(['pad','orb','portal','gravityPortal','speedPortal','deco'].includes(o.t))continue;
+  if(hit(o,PX,g.y)){die();return}
+ }
+ g.pct=Math.min(100,Math.floor(g.scroll/g.level.length*100));$('percent').textContent=g.pct+'%';$('bar').style.width=g.pct+'%';
+ if(g.pct>(bests[g.level.id]||0)){bests[g.level.id]=g.pct;$('best').textContent=g.pct+'%';saveData()}
+ drawGame();if(g.scroll>=g.level.length){win();return}raf=requestAnimationFrame(loop)
+}
 function die(){g.state='dead';stopMusic();beep(190,.18,'sawtooth',.04);cancelAnimationFrame(raf);g.pct=Math.min(99,Math.floor(g.scroll/g.level.length*100));if(g.pct>(bests[g.level.id]||0))bests[g.level.id]=g.pct;saveData();overlay('CRASH!','Progression : '+g.pct+'% • Tentative '+tries,'↻ RESTART',()=>start(g.level));$('percent').textContent=g.pct+'%'}
 function win(){g.state='won';stopMusic();beep(660,.15,'triangle',.05);setTimeout(()=>beep(880,.25,'triangle',.04),130);bests[g.level.id]=100;saveData();$('percent').textContent='100%';$('bar').style.width='100%';overlay('LEVEL COMPLETE!','Tu as terminé '+g.level.name+'.','▶ REJOUER',()=>start(g.level))}
 

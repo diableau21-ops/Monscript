@@ -119,7 +119,7 @@ function object(c,o,x){
  }
  objectBase(c,o,x);
 }
-function cube(c,x,y,r){c.save();c.translate(x+17,y+17);c.rotate(r);c.fillStyle='#35e8ff';c.shadowColor='#35e8ff';c.shadowBlur=20;c.fillRect(-16,-16,32,32);c.shadowBlur=0;c.strokeStyle='white';c.lineWidth=3;c.strokeRect(-14,-14,28,28);c.fillStyle='#0d1a37';c.fillRect(-8,-6,5,6);c.fillRect(4,-6,5,6);c.fillRect(-6,6,13,3);c.restore()}
+function cube(c,x,y,r){c.save();let size=(g&&g.sizeFactor)||1;c.translate(x+17,y+17);c.scale(size,size);c.rotate(r);c.fillStyle='#35e8ff';c.shadowColor='#35e8ff';c.shadowBlur=20;c.fillRect(-16,-16,32,32);c.shadowBlur=0;c.strokeStyle='white';c.lineWidth=3;c.strokeRect(-14,-14,28,28);c.fillStyle='#0d1a37';c.fillRect(-8,-6,5,6);c.fillRect(4,-6,5,6);c.fillRect(-6,6,13,3);c.restore()}
 function drawGame(){if(!g)return;let c=$('game').getContext('2d');bg(c,g.scroll);floor(c,g.scroll);g.level.objects.slice().sort((a,b)=>a.x-b.x).forEach(o=>{let x=o.x-g.scroll+PX;if(x>-100&&x<W+100)object(c,o,x)});cube(c,PX,g.y,g.rot)}
 function hit(o,x,y){let ox=o.x-g.scroll+PX;if(o.t==='spike'||o.t==='double'){let w=o.t==='double'?62:34,l=ox+6,r=ox+w-6,cx=x+17,cy=y+17;if(cx<l||cx>r||cy+13<F-36||cy-13>F)return false;let rel=Math.abs(cx-(ox+w/2))/(w/2),tip=F-36*(1-rel);return y+29>tip+3&&x+29>l&&x<r}if(o.t==='block')return x+29>ox+3&&x+3<ox+31&&y+29>F-31&&y+3<F;if(o.t==='platform')return x+29>ox&&x+3<ox+75&&y+34>=F-62&&y+18<F-49;if(o.t==='saw'){let dx=x+17-(ox+18),dy=y+17-(F-19);return dx*dx+dy*dy<28*28}return false}
 const hitBase=hit;

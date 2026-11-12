@@ -121,7 +121,7 @@ $('scroll').oninput=drawEditor;$('zoom').oninput=()=>{editorZoom=+$('zoom').valu
 $('clear').onclick=()=>{if(!placed.length)return;snapshot();placed=[];selectedObject=-1;drawEditor()};
 $('deleteObject').onclick=()=>{if(selectedObject<0)return;snapshot();placed.splice(selectedObject,1);selectedObject=-1;drawEditor()};
 $('copyObject').onclick=()=>{if(selectedObject<0)return;clipboard={...placed[selectedObject],x:placed[selectedObject].x+40};snapshot();placed.push({...clipboard});selectedObject=placed.length-1;drawEditor()};
-$('undoEdit').onclick=()=>{let prev=undoStack.pop();if(prev){placed=JSON.parse(prev);selectedObject=-1;drawEditor()}};
+$('undoEdit').onclick=()=>{let prev=undoStack.pop();if(prev){redoStack.push(JSON.stringify(placed));placed=JSON.parse(prev);selectedObject=-1;drawEditor()}};
 document.addEventListener('keydown',e=>{if(!$('editor').classList.contains('active'))return;if(e.key==='Delete'||e.key==='Backspace')$('deleteObject').click();if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='c')$('copyObject').click();if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z')$('undoEdit').click();if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='v'&&clipboard){snapshot();placed.push({...clipboard,x:clipboard.x+40});selectedObject=placed.length-1;drawEditor()}});
 $('editorHelp').onclick=()=>msg('Choisis un objet, place-le sur la grille, puis sélectionne-le pour le déplacer. Ctrl+C copie, Suppr efface.');
 function needSelection(){if(selectedObject<0||!placed[selectedObject]){msg('Sélectionne un objet sur la grille.');return null}return placed[selectedObject]}
@@ -139,7 +139,7 @@ $('toggleGrid').onclick=()=>{gridOn=!gridOn;drawEditor();msg(gridOn?'Grille affi
 $('editorCanvas').addEventListener('dblclick',()=>{if(selectedObject>=0){let o=placed[selectedObject];o.x=Math.max(0,Math.round(o.x/40)*40);drawEditor()}})
 document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{editMode=b.dataset.mode;document.querySelectorAll('[data-mode]').forEach(x=>x.classList.toggle('selected',x===b));if(editMode==='delete')setEditorTool('erase');else if(editMode==='edit')setEditorTool('select');else setEditorTool('select')})
 document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>{
- const a=b.dataset.action,o=needSelection();
+ const a=b.dataset.action,o=placed[selectedObject]||null;
  if(a==='copy'){if(o){clipboard={...o};msg('Objet copié')}}
  else if(a==='paste'){if(clipboard){snapshot();placed.push({...clipboard,x:clipboard.x+40});selectedObject=placed.length-1;drawEditor()}else msg('Rien à coller')}
  else if(a==='copyPaste'){if(o){clipboard={...o};snapshot();placed.push({...o,x:o.x+40});selectedObject=placed.length-1;drawEditor()}}
